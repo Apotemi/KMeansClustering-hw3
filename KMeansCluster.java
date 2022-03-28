@@ -1,110 +1,106 @@
-import javax.swing.*;
+/**
+    03.30.2022
+    Bil211 Homework-3
+    
+    Yusuf Aydın 211101019
+    yusufaydin@etu.edu.tr
+*/
+
 import java.awt.*;
-import java.awt.event.*;
+import java.util.*;
 import java.io.*;
 
-public class KMeansCluster extends JFrame {
-    private static final int WIDTH = 1280;
-    private static final int HEIGHT = 720;
-    private File selectedFile;
+public class KMeansCluster {
+    private File inputFile;
     private int numOfIteration;
     private int numOfCenter;
+    private ArrayList<Point> points;
+    private ArrayList<Point> centers;
+    private ArrayList<ArrayList<Point>> clusters;
 
-    public KMeansCluster() {
-        super();
-        this.setTitle("K-Means Clustering");
-        this.setSize(WIDTH,HEIGHT);
-        this.setPreferredSize(new Dimension(WIDTH,HEIGHT));
-        this.getContentPane().setBackground(Color.lightGray);
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.setLayout(new BorderLayout());
+    public KMeansCluster(File inputFile, int numOfCenter, int numOfIteration) {
+        this.inputFile = inputFile;
+        this.numOfCenter = numOfCenter;
+        this.numOfIteration = numOfIteration;
+        this.points = getPoints(inputFile);
+        this.clusters = new ArrayList<>(numOfCenter);
+        this.centers = new ArrayList<>(numOfCenter);
 
-        JLabel iterationLabel = new JLabel("Iterasyon: ");
-        JLabel centerLabel = new JLabel("K sayisi (CENTER): ");
+        for(int i = 0; i < numOfCenter; i++)
+            clusters.add(new ArrayList<>(points.size()/numOfCenter));
 
-        JTextField iterationField = new JTextField(4);
-        iterationField.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                try {
-                    numOfIteration = Integer.parseInt(iterationField.getText());
-                } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(null, "Iterasyon icin yalnizca tam sayi girebilirsiniz," +
-                            " aksi taktirde varsayilan iterasyon 0 olarak belirlenir.");
-                }
-            }
-        });
-
-        //MERKEZ SECIM EKRANI ORNEKTEKI GIBI OLUSMUYOR!!!!
-        JMenuBar menuBar = new JMenuBar();
-        JMenu centerMenu = new JMenu();
-
-        for (int i = 1; i <= 10; i++) {
-            JMenuItem item = new JMenuItem(Integer.toString(i));
-            item.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent actionEvent) {
-                    numOfCenter = Integer.parseInt(actionEvent.getActionCommand());
-                }
-            });
-            centerMenu.add(item);
+        for(int i = 0; i < numOfCenter; i++) {
+            int x = (int)(1280*Math.random());
+            int y = (int)(720*Math.random());
+            centers.add(new Point(x,y));
         }
-        menuBar.add(centerMenu);
-
-        JButton openFileButton = new JButton("Dosyadan sec");
-        openFileButton.addActionListener(new FileOpener());
-
-        JButton clusteringButton = new JButton("K-Means Clustering");
-        clusteringButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                try {
-
-                    ClusterPanel mainPanel = new ClusterPanel(selectedFile, numOfCenter, numOfIteration);
-                    add(mainPanel, BorderLayout.CENTER);
-                    pack();
-
-                } catch (NullPointerException e) {
-                    JOptionPane.showMessageDialog(null,"Kumelendirme yapilacak veriler icin " +
-                            "\"csv\" dosyasi secmelisiniz");
-                } catch (IndexOutOfBoundsException e) {
-                    JOptionPane.showMessageDialog(null,"Kumelendirme yapilacak veriler icin " + "" +
-                            "Merkez ve Iterasyon sayisi girmelisiniz.");
-                }
-
-            }
-        });
-
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.setLayout(new FlowLayout());
-
-        bottomPanel.add(iterationLabel);
-        bottomPanel.add(iterationField);
-        bottomPanel.add(centerLabel);
-        bottomPanel.add(menuBar);
-        bottomPanel.add(openFileButton);
-        bottomPanel.add(clusteringButton);
-
-        this.add(bottomPanel, BorderLayout.SOUTH);
-
+        clustering();
     }
 
-    private class FileOpener implements ActionListener {
+    private void clustering() {
+        relocatingCenters();
+        int x = 0, y = 0, j = 0;
 
-        public void actionPerformed(ActionEvent e) {
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setCurrentDirectory(new File(System.getProperty("user.dir")));
-
-            int returnValue = fileChooser.showOpenDialog(null);
-
-            if (returnValue == JFileChooser.APPROVE_OPTION)
-                selectedFile = fileChooser.getSelectedFile();
-
-            String fileName = selectedFile.getName();
-            if (!fileName.substring(fileName.indexOf(".") + 1).equals("csv")) {
-                JOptionPane.showMessageDialog(null, ".csv disinda bir dosya secemezsiniz!");
-                selectedFile = null;
+        for(int k = 0; k < numOfIteration; k++) {
+            for (int i = 0; i < clusters.size(); i++) {
+                for (j = 0; j < clusters.get(i).size(); j++) {
+                    x += (int) clusters.get(i).get(j).getX();
+                    y += (int) clusters.get(i).get(j).getY();
+                }
+                centers.get(i).setLocation(x/j,y/j);
+                x = 0;
+                y = 0;
             }
+        relocatingCenters();
         }
+    }
+
+    private void relocatingCenters() {
+        for(int i = 0; i < clusters.size(); i++)
+            clusters.get(i).clear();
+
+        for(int i = 0; i < points.size(); i++) {
+            int index = 0;
+            double min = points.get(i).distance(centers.get(0));
+
+            for(int j = 1; j < centers.size(); j++) {
+                if(min > points.get(i).distance(centers.get(j))) {
+                    min = points.get(i).distance(centers.get(j));
+                    index = j;
+                }
+            }
+            clusters.get(index).add(points.get(i));
+        }
+    }
+
+    private ArrayList<Point> getPoints(File inputFile) {
+        ArrayList<Point> points = new ArrayList<>(1000);
+
+        Scanner inputStream = null;
+
+        try {
+            inputStream = new Scanner(inputFile);
+        } catch(FileNotFoundException e) {
+            System.out.println(e.getMessage());
+            System.exit(0);
+        }
+
+        while(inputStream.hasNext()) {
+            String[] temp = inputStream.next().split(",");
+            int x = Integer.parseInt(temp[0]);
+            int y = Integer.parseInt(temp[1]);
+
+            points.add(new Point(x,y));
+        }
+
+        points.trimToSize();
+        return points;
+    }
+
+    public ArrayList<ArrayList<Point>> getClusters() {
+        return clusters;
+    }
+    public ArrayList<Point> getCenters() {
+        return centers;
     }
 }
